@@ -207,15 +207,25 @@
     const posX = Math.round(runtime.posX);
     const posY = 0; // Все слои 800x560 садятся на нулевую высоту сцены
 
-    // Слои по порядку Z-Index:
-    // 1. Базовое тело
+    // Слои по порядку отрисовки (Z-Index снизу вверх):
+
+    // 1. Предмет в лапках (строго на ЗАДНЕМ плане, чтобы лапки тела обхватывали предмет спереди)
+    if (state.hand !== 'none') {
+      const handSrc = `./assets/bunny/${action}/${action}-hand-${state.hand}-${frameNum}.png`;
+      const handImg = getCachedImage(handSrc);
+      if (handImg.complete && handImg.naturalWidth > 0) {
+        ctx.drawImage(handImg, posX, posY);
+      }
+    }
+
+    // 2. Базовое тело (основа: фартук или тело, рисуется поверх предмета в лапках)
     const baseSrc = `./assets/bunny/${action}/${action}-base-${state.base}-${frameNum}.png`;
     const baseImg = getCachedImage(baseSrc);
     if (baseImg.complete && baseImg.naturalWidth > 0) {
       ctx.drawImage(baseImg, posX, posY);
     }
 
-    // 2. Головной убор (если выбран)
+    // 3. Головной убор (если выбран, садится поверх головы)
     if (state.hat !== 'none') {
       const hatNum = state.hat === 'hat1' ? '1' : '2';
       const hatSrc = `./assets/bunny/${action}/${action}-hat-${hatNum}-${frameNum}.png`;
@@ -225,21 +235,12 @@
       }
     }
 
-    // 3. Аксессуар (бантик на ушко)
+    // 4. Аксессуар (бантик на ушко)
     if (state.accessory === 'bowl') {
       const bowlSrc = `./assets/bunny/${action}/${action}-bowl-${frameNum}.png`;
       const bowlImg = getCachedImage(bowlSrc);
       if (bowlImg.complete && bowlImg.naturalWidth > 0) {
         ctx.drawImage(bowlImg, posX, posY);
-      }
-    }
-
-    // 4. Предмет в лапках
-    if (state.hand !== 'none') {
-      const handSrc = `./assets/bunny/${action}/${action}-hand-${state.hand}-${frameNum}.png`;
-      const handImg = getCachedImage(handSrc);
-      if (handImg.complete && handImg.naturalWidth > 0) {
-        ctx.drawImage(handImg, posX, posY);
       }
     }
 
