@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VTube Unuasha — Конструктор и аниматор зайки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="toast" class="toast">Скопировано в буфер!</div>
+
+  <div class="app-layout">
+    <!-- Шапка -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-emoji">🐰</span>
+        <div>
+          <h1 class="brand-title">Bunny Customizer & Sequence Player</h1>
+          <p class="brand-subtitle">Интерактивный конструктор слоёв и покадровый симулятор для Unuasha HUD</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge badge-fps" id="badge-fps">8 FPS (Native)</span>
+        <span class="badge badge-status" id="badge-status">Загрузка кадров...</span>
+      </div>
+    </header>
+
+    <!-- Сцена предпросмотра -->
+    <section class="stage-section">
+      <div class="stage-toolbar">
+        <div class="stage-controls">
+          <button id="btn-play-pause" class="btn btn-primary" title="Пробел: Пауза / Старт">
+            <span id="btn-play-icon">⏸️</span> <span id="btn-play-text">Пауза</span>
+          </button>
+          <button id="btn-step" class="btn btn-secondary" title="Следующий кадр">
+            ⏭️ Шаг
+          </button>
+          <button id="btn-reset" class="btn btn-secondary" title="Сбросить в начало">
+            🔄 Сброс
+          </button>
+        </div>
+
+        <div class="stage-info">
+          <span class="info-pill" id="info-mode">Режим: Walk → Fall</span>
+          <span class="info-pill" id="info-frame">Кадр: 1 / 5</span>
+          <span class="info-pill" id="info-pos">X: 0 px</span>
+        </div>
+
+        <div class="stage-bg-toggles">
+          <span class="bg-label">Фон:</span>
+          <button class="bg-btn active" data-bg="grid" title="Сетка прозрачности">🏁</button>
+          <button class="bg-btn" data-bg="dark" title="Тёмный фон">⬛</button>
+          <button class="bg-btn" data-bg="cafe" title="Кафе (доска)">☕</button>
+          <button class="bg-btn" data-bg="green" title="Хромакей">🟩</button>
+        </div>
+      </div>
+
+      <!-- Контейнер холста сцены -->
+      <div class="stage-viewport bg-grid" id="stage-viewport">
+        <canvas id="stage-canvas" width="1600" height="560"></canvas>
+      </div>
+    </section>
+
+    <!-- Панель управления и кастомизации -->
+    <main class="controls-panel">
+      <!-- Секция 1: Режим анимации -->
+      <div class="control-card">
+        <div class="card-header">
+          <span class="card-icon">🎬</span>
+          <h2 class="card-title">Режим анимации</h2>
+        </div>
+        <div class="chips-group" id="group-mode">
+          <label class="chip">
+            <input type="radio" name="mode" value="walk_fall" checked>
+            <span class="chip-content">
+              <strong>Walk → Fall</strong>
+              <small>Шагает, затем спотыкается и падает</small>
+            </span>
+          </label>
+          <label class="chip">
+            <input type="radio" name="mode" value="walk_move">
+            <span class="chip-content">
+              <strong>Walk (Движение)</strong>
+              <small>Непрерывно шагает через экран</small>
+            </span>
+          </label>
+          <label class="chip">
+            <input type="radio" name="mode" value="walk_static">
+            <span class="chip-content">
+              <strong>Walk (На месте)</strong>
+              <small>Походка по центру экрана</small>
+            </span>
+          </label>
+          <label class="chip">
+            <input type="radio" name="mode" value="fall_static">
+            <span class="chip-content">
+              <strong>Fall (Только падение)</strong>
+              <small>15 кадров падения на месте</small>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Секция 2: Слои зайки -->
+      <div class="control-card">
+        <div class="card-header">
+          <span class="card-icon">🎨</span>
+          <h2 class="card-title">Слои и кастомизация персонажа</h2>
+        </div>
+
+        <div class="layers-grid">
+          <!-- База -->
+          <div class="layer-block">
+            <h3 class="layer-title">👗 Основа (Тело)</h3>
+            <div class="chips-group-small" id="group-base">
+              <label class="chip-small">
+                <input type="radio" name="base" value="fartuk" checked>
+                <span>В фартуке</span>
+              </label>
+              <label class="chip-small">
+                <input type="radio" name="base" value="nude">
+                <span>Без фартука</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Головной убор -->
+          <div class="layer-block">
+            <h3 class="layer-title">🎩 Головной убор</h3>
+            <div class="chips-group-small" id="group-hat">
+              <label class="chip-small">
+                <input type="radio" name="hat" value="none">
+                <span>Без шапочки</span>
+              </label>
+              <label class="chip-small">
+                <input type="radio" name="hat" value="hat1" checked>
+                <span>Шапочка 1 (Поварская)</span>
+              </label>
+              <label class="chip-small">
+                <input type="radio" name="hat" value="hat2">
+                <span>Шапочка 2 (Берет)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Аксессуары -->
+          <div class="layer-block">
+            <h3 class="layer-title">🎀 Аксессуары</h3>
+            <div class="chips-group-small" id="group-accessory">
+              <label class="chip-small">
+                <input type="radio" name="accessory" value="none">
+                <span>Без аксессуара</span>
+              </label>
+              <label class="chip-small">
+                <input type="radio" name="accessory" value="bowl" checked>
+                <span>Бантик на ушко</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- В лапках -->
+          <div class="layer-block">
+            <h3 class="layer-title">🍰 Предмет в лапках</h3>
+            <div class="chips-group-small" id="group-hand">
+              <label class="chip-small">
+                <input type="radio" name="hand" value="none">
+                <span>Пустые лапки</span>
+              </label>
+              <label class="chip-small">
+                <input type="radio" name="hand" value="cake" checked>
+                <span>Кусочек торта</span>
+              </label>
+              <label class="chip-small">
+                <input type="radio" name="hand" value="coffee">
+                <span>Стакан кофе</span>
+              </label>
+              <label class="chip-small">
+                <input type="radio" name="hand" value="cup">
+                <span>Чашка</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Секция 3: Параметры физики и времени -->
+      <div class="control-card">
+        <div class="card-header">
+          <span class="card-icon">⚙️</span>
+          <h2 class="card-title">Физика, тайминги и скорость</h2>
+        </div>
+
+        <div class="sliders-grid">
+          <!-- FPS -->
+          <div class="slider-field">
+            <div class="slider-header">
+              <label for="input-fps">Частота кадров (FPS):</label>
+              <span class="slider-val" id="val-fps">8 кадр/с</span>
+            </div>
+            <input type="range" id="input-fps" min="4" max="24" value="8" step="1">
+            <small class="slider-hint">Стандарт для пиксельной анимации — ровно 8 FPS</small>
+          </div>
+
+          <!-- Скорость перемещения -->
+          <div class="slider-field">
+            <div class="slider-header">
+              <label for="input-speed">Скорость шага (Сдвиг за кадр):</label>
+              <span class="slider-val" id="val-speed">14 px/кадр</span>
+            </div>
+            <input type="range" id="input-speed" min="4" max="32" value="14" step="1">
+            <small class="slider-hint">Пикселей смещения по X за каждый кадр походки</small>
+          </div>
+
+          <!-- Дистанция шага до падения -->
+          <div class="slider-field" id="field-walk-frames">
+            <div class="slider-header">
+              <label for="input-walk-frames">Шагов до падения (Кадров):</label>
+              <span class="slider-val" id="val-walk-frames">20 кадров (4 шага)</span>
+            </div>
+            <input type="range" id="input-walk-frames" min="5" max="60" value="20" step="5">
+            <small class="slider-hint">Сколько кадров походки длится путь перед падением</small>
+          </div>
+
+          <!-- Пауза после падения -->
+          <div class="slider-field" id="field-hold-time">
+            <div class="slider-header">
+              <label for="input-hold-time">Пауза на полу после падения:</label>
+              <span class="slider-val" id="val-hold-time">2.0 сек</span>
+            </div>
+            <input type="range" id="input-hold-time" min="0.5" max="5.0" value="2.0" step="0.5">
+            <small class="slider-hint">Время ожидания перед перезапуском цикла</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Секция 4: Экспорт и шеринг -->
+      <div class="control-card export-card">
+        <div class="card-header">
+          <span class="card-icon">📋</span>
+          <h2 class="card-title">Экспорт пресета для кода и стримера</h2>
+        </div>
+
+        <div class="export-fields">
+          <!-- Компактный ID -->
+          <div class="export-box">
+            <div class="export-header">
+              <span class="export-label">Компактная строка конфигурации (Preset ID):</span>
+              <button class="btn-copy" id="btn-copy-id">Скопировать ID</button>
+            </div>
+            <input type="text" id="text-preset-id" class="export-input" readonly value="">
+          </div>
+
+          <!-- JSON для виджета -->
+          <div class="export-box">
+            <div class="export-header">
+              <span class="export-label">JSON для виджетов `vtube-unuasha-hud`:</span>
+              <button class="btn-copy" id="btn-copy-json">Скопировать JSON</button>
+            </div>
+            <textarea id="text-preset-json" class="export-textarea" readonly rows="4"></textarea>
+          </div>
+
+          <!-- Ссылка для шеринга -->
+          <div class="export-box">
+            <div class="export-header">
+              <span class="export-label">Прямая ссылка для стримера (с авто-загрузкой этих настроек):</span>
+              <button class="btn-copy" id="btn-copy-url">Скопировать ссылку</button>
+            </div>
+            <input type="text" id="text-preset-url" class="export-input" readonly value="">
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
