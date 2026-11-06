@@ -27,34 +27,3 @@
    * **Прямая URL-ссылка:** все параметры записываются в строку запроса (Query Params) в реальном времени. Можно просто скинуть ссылку стримеру или разработчику!
 5. **Тестирование контраста:**
    * Переключение фонов сцены (шахматная сетка прозрачности, тёмный, доска кафе, хромакей).
-
----
-
-## 🚀 Быстрый запуск локально
-
-Проект не требует сборщиков, Node.js или внешних библиотек (чистый Vanilla HTML5 + CSS + ES6).
-
-Достаточно просто открыть файл `index.html` в любом браузере (или запустить локальный статический сервер, например `Live Server` в VS Code / `python -m http.server 8000`).
-
----
-
-## 🌐 Публикация на GitHub Pages
-
-Чтобы выложить этот конструктор в открытый доступ на GitHub Pages:
-
-1. Создайте новый пустой публичный репозиторий на GitHub (например, `vtube-bunny-builder`).
-2. В папке `C:\Projects\phleesty\vtube-bunny-builder` выполните команды:
-   ```bash
-   git init
-   git add .
-   git commit -m "feat: initial bunny builder & sequence player"
-   git branch -M main
-   git remote add origin https://github.com/ВАШ_АККАУНТ/vtube-bunny-builder.git
-   git push -u origin main
-   ```
-3. Откройте репозиторий на GitHub: **Settings** $\to$ **Pages** $\to$ в секции **Build and deployment** выберите:
-   * **Source:** `Deploy from a branch`
-   * **Branch:** `main` / folder: `/ (root)`
-   * Нажмите **Save**.
-4. Через 30 секунд ваш конструктор будет доступен всему миру по ссылке вида:  
-   `https://ВАШ_АККАУНТ.github.io/vtube-bunny-builder/`
