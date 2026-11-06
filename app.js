@@ -143,13 +143,14 @@
       runtime.posX = (canvas.width - SPRITE_WIDTH) / 2;
     } else if (state.mode === 'walk_move') {
       runtime.currentAction = 'walk';
-      runtime.posX = -150; // Старт чуть левее экрана
+      // Старт у правого края: нос/предмет сразу показываются на правом краю и идут налево
+      runtime.posX = canvas.width - 300;
     } else if (state.mode === 'walk_fall') {
       runtime.currentAction = 'walk';
-      // Рассчитываем стартовую позицию так, чтобы падение произошло ближе к центру сцены
+      // Зайка идет налево: стартуем справа, чтобы упасть в районе центра холста
       const totalWalkDistance = state.walkFrames * state.speed;
       const targetFallX = (canvas.width - SPRITE_WIDTH) / 2;
-      runtime.posX = Math.max(-100, targetFallX - totalWalkDistance);
+      runtime.posX = targetFallX + totalWalkDistance;
     }
   }
 
@@ -167,9 +168,9 @@
       runtime.frame = (runtime.frame % 5) + 1;
       runtime.walkStepsCount++;
 
-      // Смещение по X
+      // Смещение по X (движение строго НАЛЕВО в сторону взгляда персонажа)
       if (state.mode === 'walk_move' || state.mode === 'walk_fall') {
-        runtime.posX += state.speed;
+        runtime.posX -= state.speed;
       }
 
       // Проверка окончания походки
@@ -179,9 +180,11 @@
           runtime.frame = 1; // Бесшовно начинаем падение в этой точке!
         }
       } else if (state.mode === 'walk_move') {
-        // Зацикливание при выходе за правый край
-        if (runtime.posX > canvas.width) {
-          runtime.posX = -SPRITE_WIDTH;
+        // Мгновенное бесшовное появление с правого края без задержек:
+        // Правый край спрайта (хвостик) выходит за левый край (posX + 760 <= 0),
+        // в этот же момент левый край (нос/предмет на 300px) появляется справа (canvas.width - 300)
+        if (runtime.posX + 760 <= 0) {
+          runtime.posX = canvas.width - 300;
         }
       }
     } else if (runtime.currentAction === 'fall') {
