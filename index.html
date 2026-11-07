@@ -58,6 +58,31 @@
           <button class="bg-btn" data-bg="cafe" title="Кафе (доска)">☕</button>
           <button class="bg-btn" data-bg="green" title="Хромакей">🟩</button>
         </div>
+
+        <!-- Кнопка сохранения анимации -->
+        <div class="stage-export-actions">
+          <div class="dropdown">
+            <button id="btn-export-dropdown" class="btn btn-export" title="Сохранить анимацию в GIF или APNG">
+              💾 Скачать ▾
+            </button>
+            <div id="export-dropdown-menu" class="dropdown-menu hidden">
+              <button class="dropdown-item" id="btn-download-apng">
+                <span class="item-icon">✨</span>
+                <span class="item-text">
+                  <strong>Скачать APNG (.png)</strong>
+                  <small>32-bit цвет и чистая прозрачность (OBS, Discord)</small>
+                </span>
+              </button>
+              <button class="dropdown-item" id="btn-download-gif">
+                <span class="item-icon">🎞️</span>
+                <span class="item-text">
+                  <strong>Скачать GIF (.gif)</strong>
+                  <small>Классический GIF (универсальный)</small>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Контейнер холста сцены -->

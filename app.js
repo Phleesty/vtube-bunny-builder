@@ -446,6 +446,31 @@
       copyToClipboard(textPresetUrl.value, 'Ссылка со всеми настройками скопирована!');
     });
 
+    // Выпадающее меню сохранения анимации
+    const btnExportDropdown = document.getElementById('btn-export-dropdown');
+    const exportDropdownMenu = document.getElementById('export-dropdown-menu');
+
+    btnExportDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportDropdownMenu.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.stage-export-actions')) {
+        exportDropdownMenu.classList.add('hidden');
+      }
+    });
+
+    document.getElementById('btn-download-apng').addEventListener('click', () => {
+      exportDropdownMenu.classList.add('hidden');
+      exportAPNG();
+    });
+
+    document.getElementById('btn-download-gif').addEventListener('click', () => {
+      exportDropdownMenu.classList.add('hidden');
+      exportGIF();
+    });
+
     // Горячие клавиши (Пробел — пауза)
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
@@ -453,6 +478,258 @@
         btnPlayPause.click();
       }
     });
+  }
+
+  // === СБОРКА И ЭКСПОРТ АНИМАЦИЙ (APNG / GIF) ===
+
+  // Таблица CRC32 для генерации корректных PNG/APNG чанков
+  const CRC_TABLE = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) {
+      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    CRC_TABLE[i] = c;
+  }
+
+  function crc32(typeBytes, dataBytes) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < typeBytes.length; i++) {
+      crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ typeBytes[i]) & 0xFF];
+    }
+    for (let i = 0; i < dataBytes.length; i++) {
+      crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ dataBytes[i]) & 0xFF];
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function makeChunk(typeStr, dataUint8) {
+    const typeBytes = new Uint8Array(4);
+    for (let i = 0; i < 4; i++) typeBytes[i] = typeStr.charCodeAt(i);
+    const dataLen = dataUint8 ? dataUint8.length : 0;
+    const chunk = new Uint8Array(4 + 4 + dataLen + 4);
+    const view = new DataView(chunk.buffer);
+
+    view.setUint32(0, dataLen, false); // Длина данных
+    chunk.set(typeBytes, 4);           // Тип чанка (4 символа)
+    if (dataUint8) chunk.set(dataUint8, 8); // Сами данные
+    const crcVal = crc32(typeBytes, dataUint8 || new Uint8Array(0));
+    view.setUint32(8 + dataLen, crcVal, false); // Контрольная сумма CRC32
+    return chunk;
+  }
+
+  function parsePngChunks(pngBuffer) {
+    const bytes = new Uint8Array(pngBuffer);
+    let idx = 8; // Пропускаем 8 байт заголовка PNG
+    const chunks = [];
+    const view = new DataView(pngBuffer);
+    while (idx < bytes.length) {
+      const length = view.getUint32(idx, false);
+      const typeStr = String.fromCharCode(bytes[idx + 4], bytes[idx + 5], bytes[idx + 6], bytes[idx + 7]);
+      const data = bytes.subarray(idx + 8, idx + 8 + length);
+      chunks.push({ type: typeStr, data: data });
+      idx += 12 + length;
+    }
+    return chunks;
+  }
+
+  function assembleAPNGBlob(pngBuffers, delayMs = 125) {
+    const parsedFrames = pngBuffers.map(b => parsePngChunks(b));
+    const ihdrChunk = parsedFrames[0].find(c => c.type === 'IHDR');
+    const ihdrView = new DataView(ihdrChunk.data.buffer, ihdrChunk.data.byteOffset, ihdrChunk.data.byteLength);
+    const width = ihdrView.getUint32(0, false);
+    const height = ihdrView.getUint32(4, false);
+
+    const parts = [];
+    // 1. Сигнатура PNG
+    parts.push(new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]));
+    // 2. IHDR
+    parts.push(makeChunk('IHDR', ihdrChunk.data));
+    // 3. acTL (кол-во кадров, 0 = бесконечный цикл)
+    const acTLData = new Uint8Array(8);
+    const acTLView = new DataView(acTLData.buffer);
+    acTLView.setUint32(0, pngBuffers.length, false);
+    acTLView.setUint32(4, 0, false);
+    parts.push(makeChunk('acTL', acTLData));
+
+    let seqNumber = 0;
+    parsedFrames.forEach((frame, frameIdx) => {
+      // fcTL
+      const fcTLData = new Uint8Array(26);
+      const fcTLView = new DataView(fcTLData.buffer);
+      fcTLView.setUint32(0, seqNumber++, false);
+      fcTLView.setUint32(4, width, false);
+      fcTLView.setUint32(8, height, false);
+      fcTLView.setUint32(12, 0, false); // x_offset
+      fcTLView.setUint32(16, 0, false); // y_offset
+      fcTLView.setUint16(20, delayMs, false); // delay_num
+      fcTLView.setUint16(22, 1000, false);    // delay_den
+      fcTLData[24] = 0; // dispose_op (0 = none)
+      fcTLData[25] = 0; // blend_op (0 = source)
+      parts.push(makeChunk('fcTL', fcTLData));
+
+      // IDAT / fdAT
+      const idats = frame.filter(c => c.type === 'IDAT');
+      idats.forEach(idat => {
+        if (frameIdx === 0) {
+          parts.push(makeChunk('IDAT', idat.data));
+        } else {
+          const fdATData = new Uint8Array(4 + idat.data.length);
+          const fdATView = new DataView(fdATData.buffer);
+          fdATView.setUint32(0, seqNumber++, false);
+          fdATData.set(idat.data, 4);
+          parts.push(makeChunk('fdAT', fdATData));
+        }
+      });
+    });
+
+    // IEND
+    parts.push(makeChunk('IEND', null));
+    return new Blob(parts, { type: 'image/png' });
+  }
+
+  // Рендеринг последовательности кадров выбранной комбинации персонажа
+  function renderCompositeFrames() {
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = SPRITE_WIDTH;
+    offCanvas.height = SPRITE_HEIGHT;
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.imageSmoothingEnabled = false;
+
+    // Определяем список кадров в зависимости от режима:
+    // walk_static, walk_move: 5 кадров походки
+    // fall_static: 15 кадров падения
+    // walk_fall: 5 кадров походки + 15 кадров падения (20 кадров)
+    let sequence = [];
+    if (state.mode === 'fall_static') {
+      for (let f = 1; f <= 15; f++) sequence.push({ action: 'fall', frame: f });
+    } else if (state.mode === 'walk_fall') {
+      for (let f = 1; f <= 5; f++) sequence.push({ action: 'walk', frame: f });
+      for (let f = 1; f <= 15; f++) sequence.push({ action: 'fall', frame: f });
+    } else {
+      for (let f = 1; f <= 5; f++) sequence.push({ action: 'walk', frame: f });
+    }
+
+    const frameCanvases = [];
+    for (const item of sequence) {
+      offCtx.clearRect(0, 0, SPRITE_WIDTH, SPRITE_HEIGHT);
+
+      // 1. Предмет в лапках (задний план)
+      if (state.hand !== 'none') {
+        const handImg = getCachedImage(`./assets/bunny/${item.action}/${item.action}-hand-${state.hand}-${item.frame}.png`);
+        if (handImg.complete && handImg.naturalWidth > 0) offCtx.drawImage(handImg, 0, 0);
+      }
+      // 2. Базовое тело
+      const baseImg = getCachedImage(`./assets/bunny/${item.action}/${item.action}-base-${state.base}-${item.frame}.png`);
+      if (baseImg.complete && baseImg.naturalWidth > 0) offCtx.drawImage(baseImg, 0, 0);
+      // 3. Головной убор
+      if (state.hat !== 'none') {
+        const hatNum = state.hat === 'hat1' ? '1' : '2';
+        const hatImg = getCachedImage(`./assets/bunny/${item.action}/${item.action}-hat-${hatNum}-${item.frame}.png`);
+        if (hatImg.complete && hatImg.naturalWidth > 0) offCtx.drawImage(hatImg, 0, 0);
+      }
+      // 4. Аксессуар (бантик)
+      if (state.accessory === 'bowl') {
+        const bowlImg = getCachedImage(`./assets/bunny/${item.action}/${item.action}-bowl-${item.frame}.png`);
+        if (bowlImg.complete && bowlImg.naturalWidth > 0) offCtx.drawImage(bowlImg, 0, 0);
+      }
+
+      // Создаем копию кадра
+      const copy = document.createElement('canvas');
+      copy.width = SPRITE_WIDTH;
+      copy.height = SPRITE_HEIGHT;
+      copy.getContext('2d').drawImage(offCanvas, 0, 0);
+      frameCanvases.push(copy);
+    }
+
+    return frameCanvases;
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // Экспорт в APNG
+  async function exportAPNG() {
+    const btnDropdown = document.getElementById('btn-export-dropdown');
+    btnDropdown.classList.add('loading');
+    btnDropdown.textContent = '⏳ Создание APNG...';
+
+    try {
+      const frames = renderCompositeFrames();
+      const delayMs = Math.round(1000 / state.fps);
+
+      // Получаем ArrayBuffer для каждого кадра через toBlob
+      const pngBuffers = await Promise.all(
+        frames.map(c => new Promise(resolve => {
+          c.toBlob(blob => blob.arrayBuffer().then(resolve), 'image/png');
+        }))
+      );
+
+      const apngBlob = assembleAPNGBlob(pngBuffers, delayMs);
+      const filename = `unuasha-bunny-${state.mode}-${state.base}-${state.hat}-${state.hand}.png`;
+      downloadBlob(apngBlob, filename);
+      showToast('✨ APNG анимация успешно сохранена!');
+    } catch (e) {
+      console.error('[Export APNG] Ошибка:', e);
+      showToast('❌ Ошибка создания APNG!');
+    } finally {
+      btnDropdown.classList.remove('loading');
+      btnDropdown.textContent = '💾 Скачать ▾';
+    }
+  }
+
+  // Экспорт в GIF
+  async function exportGIF() {
+    const btnDropdown = document.getElementById('btn-export-dropdown');
+    btnDropdown.classList.add('loading');
+    btnDropdown.textContent = '⏳ Создание GIF...';
+
+    try {
+      const { GIFEncoder, quantize, applyPalette } = await import('./assets/libs/gifenc.esm.js');
+      const frames = renderCompositeFrames();
+      const delayMs = Math.round(1000 / state.fps);
+      const gif = GIFEncoder();
+
+      for (const c of frames) {
+        const ctx2 = c.getContext('2d');
+        const { data, width, height } = ctx2.getImageData(0, 0, c.width, c.height);
+
+        // Квантование в 256-цветовую палитру с поддержкой 1-bit прозрачности
+        const palette = quantize(data, 256, { format: 'rgba4444', oneBitAlpha: true });
+        const index = applyPalette(data, palette);
+
+        // Индекс прозрачного цвета
+        const transparentIndex = palette.findIndex(color => color[3] === 0);
+
+        gif.writeFrame(index, width, height, {
+          palette,
+          delay: delayMs,
+          transparent: transparentIndex !== -1,
+          transparentIndex: transparentIndex !== -1 ? transparentIndex : 0,
+          dispose: 2 // Очистка кадра для сохранения прозрачности
+        });
+      }
+
+      gif.finish();
+      const gifBlob = new Blob([gif.bytes()], { type: 'image/gif' });
+      const filename = `unuasha-bunny-${state.mode}-${state.base}-${state.hat}-${state.hand}.gif`;
+      downloadBlob(gifBlob, filename);
+      showToast('🎞️ GIF анимация успешно сохранена!');
+    } catch (e) {
+      console.error('[Export GIF] Ошибка:', e);
+      showToast('❌ Ошибка создания GIF!');
+    } finally {
+      btnDropdown.classList.remove('loading');
+      btnDropdown.textContent = '💾 Скачать ▾';
+    }
   }
 
   // Инициализация
